@@ -1,12 +1,17 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout, QWidget, QTextEdit
 from src.ui.selector import SelectionOverlay
+from src.services.capture_service import CaptureService
+from src.services.ocr_service import OCRService
 
 class FocusApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Focus - Exam Helper")
-        self.setGeometry(100, 100, 400, 300)
+        self.setGeometry(100, 100, 500, 400)
+
+        self.capture_service = CaptureService()
+        self.ocr_service = OCRService()
         
         layout = QVBoxLayout()
         
@@ -28,8 +33,13 @@ class FocusApp(QMainWindow):
         """)
         self.btn_select.clicked.connect(self.start_selection)
         
+        self.text_output = QTextEdit()
+        self.text_output.setPlaceholderText("Seçtiğin alandaki metin burada belirecek...")
+        self.text_output.setStyleSheet("font-size: 14px; padding: 5px;")
+
         layout.addWidget(self.status_label)
         layout.addWidget(self.btn_select)
+        layout.addWidget(self.text_output)
         
         container = QWidget()
         container.setLayout(layout)
@@ -42,11 +52,28 @@ class FocusApp(QMainWindow):
 
     def on_selection_done(self, coords):
         x, y, w, h = coords
-        print(f"[DEBUG] Seçilen Koordinatlar: X={x}, Y={y}, W={w}, H={h}")
-        self.status_label.setText(f"Seçim: {x}, {y} | {w}x{h} px")
         
-        # BİR SONRAKİ ADIMDA BURADA:
-        # capture_service.take_screenshot(coords) çağırılacak.
+        screen = QApplication.primaryScreen()
+        scale_factor = screen.devicePixelRatio()
+        
+        self.status_label.setText(f"İşleniyor (Scale: {scale_factor})...")
+        QApplication.processEvents()
+
+        try:
+            image = self.capture_service.capture_region(x, y, w, h, scale_factor=scale_factor)
+            
+            image.save("debug_capture.png")
+            
+            ocr_text = self.ocr_service.image_to_text(image)
+            self.text_output.setText(ocr_text)
+            
+            self.status_label.setText("İşlem Tamamlandı.")
+            print(f"[OCR SONUÇ]:\n{ocr_text}")
+            
+        except Exception as e:
+            self.status_label.setText("Hata oluştu!")
+            self.text_output.setText(f"Hata detayı: {str(e)}")
+            print(f"[ERROR] {e}")
 
 def main():
     app = QApplication(sys.argv)
