@@ -4,6 +4,7 @@ from PIL import Image
 class CaptureService:
     def __init__(self):
         self.sct = mss.mss()
+        self.y_correction = 30 #geçici
 
     def capture_region(self, x, y, w, h, scale_factor=1.0):
 
@@ -12,9 +13,11 @@ class CaptureService:
         phys_w = int(w * scale_factor)
         phys_h = int(h * scale_factor)
         
-        print(f"[Capture] Logic: {x},{y} -> Physic: {phys_x},{phys_y} (Scale: {scale_factor})")
+        corrected_y = phys_y + self.y_correction
         
-        monitor = {"top": phys_y, "left": phys_x, "width": phys_w, "height": phys_h}
+        print(f"[Capture] Orjinal Y: {phys_y} -> Düzeltilmiş Y: {corrected_y} (Offset: +{self.y_correction})")
+        
+        monitor = {"top": corrected_y, "left": phys_x, "width": phys_w, "height": phys_h}
         
         sct_img = self.sct.grab(monitor)
         

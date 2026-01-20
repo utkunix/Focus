@@ -7,4 +7,4 @@ env/
 .idea/
 .vscode/
 *.swp
-*.png
+/*.png
