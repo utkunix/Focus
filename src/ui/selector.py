@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import QWidget, QApplication
 from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint
-from PyQt6.QtGui import QPainter, QColor, QPen, QBrush
+from PyQt6.QtGui import QPainter, QColor, QPen
 
 class SelectionOverlay(QWidget):
     selection_completed = pyqtSignal(tuple)
@@ -13,7 +13,6 @@ class SelectionOverlay(QWidget):
             Qt.WindowType.WindowStaysOnTopHint |
             Qt.WindowType.Tool
         )
-        
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setCursor(Qt.CursorShape.CrossCursor)
         
@@ -28,7 +27,7 @@ class SelectionOverlay(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        overlay_color = QColor(0, 0, 0, 150) 
+        overlay_color = QColor(0, 0, 0, 100) 
         painter.fillRect(self.rect(), overlay_color)
 
         if self.start_point and self.end_point:
@@ -59,10 +58,17 @@ class SelectionOverlay(QWidget):
             self.end_point = event.pos()
             self.is_selecting = False
             
-            rect = QRect(self.start_point, self.end_point).normalized()
+            local_rect = QRect(self.start_point, self.end_point).normalized()
             
-            if rect.width() > 5 and rect.height() > 5:
-                coords = (rect.x(), rect.y(), rect.width(), rect.height())
+            if local_rect.width() > 5 and local_rect.height() > 5:
+                global_top_left = self.mapToGlobal(local_rect.topLeft())
+                
+                coords = (
+                    global_top_left.x(), 
+                    global_top_left.y(), 
+                    local_rect.width(), 
+                    local_rect.height()
+                )
                 self.selection_completed.emit(coords)
                 self.close()
             else:

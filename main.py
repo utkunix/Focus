@@ -1,7 +1,8 @@
 import sys
+import os
 from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout, QWidget, QTextEdit
 from PyQt6.QtGui import QIcon
-import os
+
 from src.ui.selector import SelectionOverlay
 from src.services.capture_service import CaptureService
 from src.services.ocr_service import OCRService
@@ -12,6 +13,7 @@ class FocusApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("Focus - Exam Helper")
         self.setGeometry(100, 100, 500, 600)
+        
         icon_path = os.path.join("assets", "icon.png")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
@@ -24,7 +26,6 @@ class FocusApp(QMainWindow):
         
         self.status_label = QLabel("Bir alan seçin...")
         self.status_label.setStyleSheet("font-size: 16px; color: #333;")
-        
         
         self.btn_select = QPushButton("Soru Seç ve Çöz")
         self.btn_select.setStyleSheet("""
@@ -44,12 +45,11 @@ class FocusApp(QMainWindow):
         self.lbl_ocr = QLabel("Okunan Metin:")
         self.text_output = QTextEdit()
         self.text_output.setMaximumHeight(100)
-        self.text_output.setPlaceholderText("Seçtiğin alandaki metin burada belirecek...")
-        self.text_output.setStyleSheet("font-size: 14px; padding: 5px;")
-
+        self.text_output.setPlaceholderText("Seçtiğin alandaki metin...")
+        
         self.lbl_ai = QLabel("Yapay Zeka Cevabı:")
         self.text_ai = QTextEdit()
-        self.text_ai.setPlaceholderText("Cevap burada belirecek...")
+        self.text_ai.setPlaceholderText("Cevap bekleniyor...")
         self.text_ai.setStyleSheet("font-size: 15px; color: #2c3e50; background-color: #f4f6f7; border: 2px solid #27ae60; border-radius: 8px; padding: 10px;")
 
         layout.addWidget(self.status_label)
@@ -74,7 +74,7 @@ class FocusApp(QMainWindow):
         screen = QApplication.primaryScreen()
         scale_factor = screen.devicePixelRatio()
         
-        self.status_label.setText(f"İşleniyor (Scale: {scale_factor})...")
+        self.status_label.setText("İşleniyor...")
         self.text_output.clear()
         self.text_ai.clear()
         QApplication.processEvents()
@@ -97,11 +97,10 @@ class FocusApp(QMainWindow):
             self.text_ai.setText(answer)
             
             self.status_label.setText("İşlem Tamamlandı.")
-            print(f"[AI Cevabı]: {answer}")
             
         except Exception as e:
             self.status_label.setText("Hata oluştu!")
-            self.text_ai.setText(f"Hata detayı: {str(e)}")
+            self.text_ai.setText(f"Hata: {str(e)}")
             print(f"[ERROR] {e}")
 
 def main():
