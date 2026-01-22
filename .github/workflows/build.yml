@@ -1,0 +1,66 @@
+name: Build Focus App
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Python Kur
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Tesseract OCR Kur (Windows)
+      run: |
+        choco install tesseract
+        echo "C:\Program Files\Tesseract-OCR" >> $env:GITHUB_PATH
+        
+    - name: Bağımlılıkları Yükle
+      run: |
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Exe Oluştur (PyInstaller)
+      run: |
+        pyinstaller --noconsole --onefile --name "FocusExamHelper" --icon="assets/icon.png" --add-data "assets/icon.png;assets" main.py
+
+    - name: Exe'yi Yükle (Artifacts)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Focus-Windows-Exe
+        path: dist/FocusExamHelper.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Python Kur
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Bağımlılıkları Yükle
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tesseract-ocr libtesseract-dev xcb libxcb-cursor0
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Linux Binary Oluştur
+      run: |
+        pyinstaller --noconsole --onefile --name "FocusExamHelper_Linux" --icon="assets/icon.png" --add-data "assets/icon.png:assets" main.py
+
+    - name: Linux Dosyasını Yükle
+      uses: actions/upload-artifact@v4
+      with:
+        name: Focus-Linux-Binary
+        path: dist/FocusExamHelper_Linux
