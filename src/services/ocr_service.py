@@ -1,48 +1,58 @@
 import pytesseract
-from PIL import Image, ImageOps, ImageStat
 import sys
+import os
+import cv2
+import numpy as np
+from PIL import Image
 
 class OCRService:
     def __init__(self, lang='tur+eng'):
         self.lang = lang
-        
         if sys.platform.startswith("win"):
             possible_paths = [
                 r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-                r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-                os.path.join(os.getenv('LOCALAPPDATA', ''), r'Tesseract-OCR\tesseract.exe')
+                r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"
             ]
             for path in possible_paths:
                 if os.path.exists(path):
                     pytesseract.pytesseract.tesseract_cmd = path
-                    print(f"[OCR Service] Windows modu: Tesseract {path} adresinde bulundu.")
                     break
-                          
-    def image_to_text(self, image: Image):
-        """
-        Adımlar: Gri Ton -> Ters Çevir (Koyu Temaysa) -> Büyüt -> Eşikle -> Çerçevele
-        """
+
+    def find_text_bounds(self, thresh_img):
+        """Metnin bulunduğu en küçük çerçeveyi tespit eder (Auto-Crop)."""
+        coords = cv2.findNonZero(255 - thresh_img)
+        if coords is not None:
+            x, y, w, h = cv2.boundingRect(coords)
+            return x, y, w, h
+        return None
+
+    def preprocess_image(self, pil_image):
+        open_cv_image = np.array(pil_image.convert('RGB'))
+        img = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2BGR)
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        denoised = cv2.bilateralFilter(gray, 9, 75, 75)
+        _, thresh = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        bounds = self.find_text_bounds(thresh)
+        if bounds:
+            x, y, w, h = bounds
+            padding = 15
+            x, y = max(0, x - padding), max(0, y - padding)
+            w, h = w + (padding * 2), h + (padding * 2)
+            thresh = thresh[y:y+h, x:x+w]
+
+        scaled = cv2.resize(thresh, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+        return scaled
+
+    def image_to_text(self, image: Image, psm=6):
         try:
-            gray_image = image.convert('L')
-            stat = ImageStat.Stat(gray_image)
-            avg_brightness = stat.mean[0]
+            processed_img = self.preprocess_image(image)
+            cv2.imwrite("debug_ocr_processed.png", processed_img)
 
-            if avg_brightness < 128:
-                gray_image = ImageOps.invert(gray_image)
-
-            new_size = tuple(3 * x for x in gray_image.size)
-            processed_image = gray_image.resize(new_size, Image.Resampling.LANCZOS)
-
-            processed_image = ImageOps.expand(processed_image, border=20, fill='white')
-
-            processed_image.save("debug_ocr.png")
-
-            config = r'--oem 3 --psm 6'
-            text = pytesseract.image_to_string(processed_image, lang=self.lang, config=config)
+            config = f'--oem 3 --psm {psm}'
+            text = pytesseract.image_to_string(processed_img, lang=self.lang, config=config)
             return text.strip()
             
         except Exception as e:
-            print(f"[OCR Hatası] Metin okunamadı: {e}")
-            if sys.platform.startwith("win"):
-                print("İPUCU: Windows'ta Tesseract yüklü mü? Path'e eklendi mi ?")
-            return ""
+            return f"Hata: OCR okunurken bir sorun oluştu. ({str(e)})"

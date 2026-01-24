@@ -1,7 +1,11 @@
 import sys
 import os
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout, QWidget, QTextEdit
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QPushButton, QLabel, 
+    QVBoxLayout, QWidget, QTextEdit, QMessageBox, QComboBox
+)
 from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt, QTimer
 
 from src.ui.selector import SelectionOverlay
 from src.services.capture_service import CaptureService
@@ -11,8 +15,8 @@ from src.services.ai_service import AIService
 class FocusApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Focus - Exam Helper")
-        self.setGeometry(100, 100, 500, 600)
+        self.setWindowTitle("Focus - AI Exam Helper")
+        self.setGeometry(100, 100, 550, 750)
         
         icon_path = os.path.join("assets", "icon.png")
         if os.path.exists(icon_path):
@@ -23,41 +27,54 @@ class FocusApp(QMainWindow):
         self.ai_service = AIService()
         
         layout = QVBoxLayout()
+        layout.setSpacing(10)
         
-        self.status_label = QLabel("Bir alan seçin...")
-        self.status_label.setStyleSheet("font-size: 16px; color: #333;")
+        self.status_label = QLabel("Başlamak için bir alan seçin...")
+        self.status_label.setStyleSheet("font-size: 15px; color: #34495e; font-weight: bold; padding: 5px;")
         
+        self.psm_label = QLabel("Okuma Modu (OCR Hassasiyeti):")
+        self.psm_combo = QComboBox()
+        self.psm_combo.addItems([
+            "Otomatik Analiz (PSM 3)", 
+            "Tek Metin Bloğu (PSM 6)", 
+            "Tek Satır (PSM 7)"
+        ])
+        self.psm_combo.setCurrentIndex(1)
+
         self.btn_select = QPushButton("Soru Seç ve Çöz")
         self.btn_select.setStyleSheet("""
-            QPushButton {
-                background-color: #2c3e50;
-                color: white;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #34495e;
-            }
+            QPushButton { background-color: #2c3e50; color: white; padding: 12px; font-size: 15px; font-weight: bold; border-radius: 6px; }
+            QPushButton:hover { background-color: #34495e; }
         """)
         self.btn_select.clicked.connect(self.start_selection)
         
         self.lbl_ocr = QLabel("Okunan Metin:")
         self.text_output = QTextEdit()
         self.text_output.setMaximumHeight(100)
-        self.text_output.setPlaceholderText("Seçtiğin alandaki metin...")
         
-        self.lbl_ai = QLabel("Yapay Zeka Cevabı:")
+        self.lbl_ai = QLabel("Yapay Zeka Çözümü:")
         self.text_ai = QTextEdit()
         self.text_ai.setPlaceholderText("Cevap bekleniyor...")
-        self.text_ai.setStyleSheet("font-size: 15px; color: #2c3e50; background-color: #f4f6f7; border: 2px solid #27ae60; border-radius: 8px; padding: 10px;")
+        self.text_ai.setStyleSheet("""
+            QTextEdit { font-size: 15px; color: #2c3e50; background-color: #fdfefe; border: 2px solid #27ae60; border-radius: 10px; padding: 10px; }
+        """)
+
+        self.btn_copy = QPushButton("Çözümü Panoya Kopyala")
+        self.btn_copy.setStyleSheet("""
+            QPushButton { background-color: #95a5a6; color: white; padding: 10px; font-size: 13px; font-weight: bold; border-radius: 5px; margin-top: 5px; }
+            QPushButton:hover { background-color: #7f8c8d; }
+        """)
+        self.btn_copy.clicked.connect(self.copy_to_clipboard)
 
         layout.addWidget(self.status_label)
+        layout.addWidget(self.psm_label)
+        layout.addWidget(self.psm_combo)
         layout.addWidget(self.btn_select)
         layout.addWidget(self.lbl_ocr)
         layout.addWidget(self.text_output)
         layout.addWidget(self.lbl_ai)
         layout.addWidget(self.text_ai)
+        layout.addWidget(self.btn_copy)
         
         container = QWidget()
         container.setLayout(layout)
@@ -70,38 +87,61 @@ class FocusApp(QMainWindow):
 
     def on_selection_done(self, coords):
         x, y, w, h = coords
+        scale_factor = QApplication.primaryScreen().devicePixelRatio()
         
-        screen = QApplication.primaryScreen()
-        scale_factor = screen.devicePixelRatio()
-        
-        self.status_label.setText("İşleniyor...")
+        self.status_label.setText("Görsel işleniyor...")
+        self.status_label.setStyleSheet("color: #2980b9; font-weight: bold;")
         self.text_output.clear()
         self.text_ai.clear()
         QApplication.processEvents()
 
         try:
             image = self.capture_service.capture_region(x, y, w, h, scale_factor=scale_factor)
-            image.save("debug_capture.png")
             
-            ocr_text = self.ocr_service.image_to_text(image)
+            psm_map = {0: 3, 1: 6, 2: 7}
+            selected_psm = psm_map[self.psm_combo.currentIndex()]
+            
+            ocr_text = self.ocr_service.image_to_text(image, psm=selected_psm)
             self.text_output.setText(ocr_text)
             
-            if not ocr_text.strip():
-                self.status_label.setText("Metin bulunamadı!")
+            if not ocr_text or "Hata:" in ocr_text:
+                self.status_label.setText("Hata: Metin okunamadı.")
+                self.status_label.setStyleSheet("color: #c0392b; font-weight: bold;")
                 return
 
-            self.status_label.setText("Yapay Zeka Düşünüyor...")
+            self.status_label.setText("Yapay Zeka cevap hazırlıyor...")
             QApplication.processEvents()
 
             answer = self.ai_service.get_answer(ocr_text)
-            self.text_ai.setText(answer)
             
-            self.status_label.setText("İşlem Tamamlandı.")
+            if answer.startswith("Hata:"):
+                self.status_label.setText("AI Yanıt Veremedi.")
+                self.status_label.setStyleSheet("color: #c0392b; font-weight: bold;")
+            else:
+                self.text_ai.setMarkdown(answer)
+                self.status_label.setText("İşlem Başarılı.")
+                self.status_label.setStyleSheet("color: #27ae60; font-weight: bold;")
             
         except Exception as e:
-            self.status_label.setText("Hata oluştu!")
-            self.text_ai.setText(f"Hata: {str(e)}")
-            print(f"[ERROR] {e}")
+            QMessageBox.critical(self, "Beklenmedik Hata", str(e))
+            self.status_label.setText("Sistem hatası.")
+
+    def copy_to_clipboard(self):
+        text = self.text_ai.toPlainText()
+        if text:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(text)
+            
+            original_status = self.status_label.text()
+            original_style = self.status_label.styleSheet()
+            
+            self.status_label.setText("✅ Çözüm panoya kopyalandı!")
+            self.status_label.setStyleSheet("color: #27ae60; font-weight: bold;")
+            QTimer.singleShot(2000, lambda: self.reset_status(original_status, original_style))
+
+    def reset_status(self, text, style):
+        self.status_label.setText(text)
+        self.status_label.setStyleSheet(style)
 
 def main():
     app = QApplication(sys.argv)
