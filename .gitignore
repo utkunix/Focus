@@ -8,3 +8,7 @@ env/
 .vscode/
 *.swp
 /*.png
+Output/
+setup_files/
+venv/
+setup_files/

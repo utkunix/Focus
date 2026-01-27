@@ -1,8 +1,10 @@
 import sys
 import os
+import platform
+import webbrowser
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, 
-    QVBoxLayout, QWidget, QTextEdit, QMessageBox, QComboBox
+    QVBoxLayout, QWidget, QTextEdit, QMessageBox, QComboBox, QInputDialog
 )
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QTimer
@@ -11,6 +13,77 @@ from src.ui.selector import SelectionOverlay
 from src.services.capture_service import CaptureService
 from src.services.ocr_service import OCRService
 from src.services.ai_service import AIService
+
+class FirstRunWizard:
+    @staticmethod
+    def check_api_key():
+        """
+        API anahtarı yoksa kullanıcıyı siteye yönlendirir ve anahtarı alıp .env dosyasına kaydeder.
+        """
+        env_path = ".env"
+        if os.path.exists(env_path):
+            with open(env_path, "r") as f:
+                content = f.read()
+                if "GROQ_API_KEY" in content and "gsk_" in content:
+                    return True
+
+        msg = QMessageBox()
+        msg.setWindowTitle("Focus - İlk Kurulum")
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setText("Hoş Geldiniz! Focus'u kullanmak için ücretsiz bir API Anahtarı gereklidir.")
+        msg.setInformativeText("Henüz bir anahtarınız yoksa, aşağıdan siteye gidip ücretsiz alabilirsiniz.\n\nSite: console.groq.com/keys")
+
+        btn_get_key = msg.addButton("🌐 Siteyi Aç (Anahtar Al)", QMessageBox.ButtonRole.ActionRole)
+        btn_enter_key = msg.addButton("🔑 Anahtarım Var", QMessageBox.ButtonRole.AcceptRole)
+        
+        msg.exec()
+        
+        if msg.clickedButton() == btn_get_key:
+            webbrowser.open("https://console.groq.com/keys")
+        
+        key, ok = QInputDialog.getText(
+            None, 
+            "API Anahtarı Girişi", 
+            "Lütfen 'gsk_' ile başlayan anahtarınızı aşağıya yapıştırın:",
+            text=""
+        )
+        
+        if ok and key and key.strip():
+            with open(env_path, "w") as f:
+                f.write(f"GROQ_API_KEY={key.strip()}")
+            
+            os.environ["GROQ_API_KEY"] = key.strip()
+            
+            QMessageBox.information(None, "Başarılı", "Kurulum tamamlandı! Focus açılıyor...")
+            return True
+        else:
+            QMessageBox.critical(None, "Hata", "API anahtarı girilmediği için uygulama başlatılamıyor.")
+            sys.exit()
+
+    @staticmethod
+    def check_tesseract():
+        """
+        Tesseract kontrolü (Değişiklik yok, aynen kalabilir)
+        """
+        try:
+            import pytesseract
+            if platform.system() == "Windows":
+                 paths = [
+                     r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+                     r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+                     os.path.join(os.getenv('LOCALAPPDATA', ''), r'Tesseract-OCR\tesseract.exe')
+                 ]
+                 for p in paths:
+                     if os.path.exists(p):
+                         pytesseract.pytesseract.tesseract_cmd = p
+                         break
+            
+            pytesseract.get_tesseract_version()
+            return True
+        except Exception:
+
+            pass
+
 
 class FocusApp(QMainWindow):
     def __init__(self):
@@ -150,4 +223,12 @@ def main():
     sys.exit(app.exec())
 
 if __name__ == "__main__":
-    main()
+    app = QApplication(sys.argv)
+    
+    FirstRunWizard.check_tesseract()
+    
+    FirstRunWizard.check_api_key()
+
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())

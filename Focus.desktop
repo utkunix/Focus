@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.3
+Type=Application
+Name=Focus Exam Helper
+Comment=Yapay Zeka Destekli Sınav Asistanı
+Exec=/home/utkukalender/Focus/venv/bin/python3 /home/utkukalender/Focus/main.py
+Icon=/home/utkukalender/Focus/assets/icon.png
+Path=/home/utkukalender/Focus
+Terminal=false
+Categories=Utility;Education;
+StartupNotify=true
