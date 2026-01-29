@@ -229,6 +229,6 @@ if __name__ == "__main__":
     
     FirstRunWizard.check_api_key()
 
-    window = MainWindow()
+    window = FocusApp()
     window.show()
     sys.exit(app.exec())
