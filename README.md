@@ -145,7 +145,7 @@ You can copy the solution with a single click.
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 👨‍💻 Author
-Utku Kalender - Initial work - GitHub Profile
+Utku Kalender - Initial work
 
 ## 🎥 Nasıl Çalışır?
 
